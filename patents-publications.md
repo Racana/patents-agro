@@ -1,6 +1,7 @@
 ### Cuantas patentes hay disponibles bajo el CPC code A01N dentro de los países de SudAmerica, NA, Alemania y Japón?
 
 ```sql
+CREATE OR REPLACE TABLE `patent-agro.patents.publications` AS 
 SELECT 
     publication_number,
     country_code,
@@ -35,7 +36,7 @@ SELECT
     country_code,
     abstract.language, 
     COUNT(*) q
-FROM `acn-researchplatform.ad_hocs.publications_agrochemicals`,
+FROM `patent-agro.patents.publications`,
 UNNEST(abstract_localized) as abstract
 GROUP BY abstract.language, country_code
 ORDER BY country_code ASC, q DESC
@@ -63,7 +64,7 @@ ORDER BY country_code ASC, q DESC
 
 ```sql
 SELECT title.text, COUNT(DISTINCT country_code) q
-FROM `acn-researchplatform.ad_hocs.publications_agrochemicals`,
+FROM `patent-agro.patents.publications`,
 UNNEST(title_localized) as title
 GROUP BY title.text
 HAVING q > 1;
@@ -81,7 +82,7 @@ Solo 3472 patentes están registradas en más de un país
 ### Ejemplo de patente
 ```sql
 SELECT *
-FROM `acn-researchplatform.ad_hocs.publications_agrochemicals`,
+FROM `patent-agro.patents.publications`,
 UNNEST(title_localized) as title
 WHERE title.text = 'COMBINATIONS OF NEMATICIDE, INSECTICIDE AND ACARICIDAL ACTIVE PRINCIPLES INCLUDING PYRIDYLETHYLBENZAMIDE AND INSECTICIDES'
 ```
