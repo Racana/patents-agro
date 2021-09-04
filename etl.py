@@ -1,5 +1,7 @@
+import pandas as pd
 import json
 from google.cloud import storage
+from tqdm import tqdm
 
 client = storage.Client()
 
@@ -16,13 +18,69 @@ def download_blob(blob):
     """Downloads a blob from the bucket."""
 
     json_file = blob.download_as_string()
-    patents_json = [json.loads(row.decode('utf-8')) for row in json_data.split(b'\n') if row]
+    patents_json = [json.loads(row.decode('utf-8')) for row in json_file.split(b'\n') if row]
 
     return patents_json
 
+def extract_patent_metadata(patents_json, patents_metadata):
+    for patent in patents_json:
+        inventor_list = []
+        inventor_list_cc = []
+        assignee_list = []
+        assignee_list_cc = []
+        citations = []
+        parents = []
+        parents_dates = []
+        childs = []
+        childs_dates = []
 
-def extract_patent_data(patents_json, patents):
-    """Downloads and extract patent data from GCS"""
+        publication_number = patent['publication_number']
+        country_code = patent['country_code']
+        try:
+            title = patent['title_localized'][0]['text']
+        except IndexError:
+            title = None
+        publication_date = patent['publication_date']
+        filing_date = patent['filing_date']
+        grant_date = patent['grant_date']
+        
+        for inventor in patent['inventor_harmonized']:
+            inventor_list.append(inventor['name'])
+            inventor_list_cc.append(inventor['country_code'])
+
+            for assignee in patent['assignee_harmonized']:
+                assignee_list.append(assignee['name'])
+                assignee_list_cc.append(assignee['country_code'])
+
+            code = patent['code']
+            inventive = patent['inventive']
+            first = patent['first']
+            amount_citation = len(patent['citation'])
+
+                for citation in patent['citation']:
+                    citations.append(citation['publication_number'])
+
+                    for parent in patent['parent']:
+                        parents.append(parent['application_number'])
+                        parents_dates.append(parent['filing_date'])
+                    
+                        for child in patent['child']:
+                            childs.append(child['application_number'])
+                            childs_dates.append(child['filing_date'])
+
+                        patents_metadata.append((publication_number, country_code, title, publication_date, 
+                                                filing_date, grant_date, inventor_list, inventor_list_cc, 
+                                                assignee_list, assignee_list_cc, code, inventive, first, 
+                                                amount_citation, citations, parents, parents_dates, childs, 
+                                                childs_dates))
+
+
+    return patents_metadata
+
+
+
+def extract_patent_text(patents_json, patents_text):
+    """Extract patent text data from jsonfile"""
     for patent in patents_json:
         publication_number = patent['publication_number']
         try:
@@ -45,20 +103,29 @@ def extract_patent_data(patents_json, patents):
         publication_date = patent['publication_date']
         filing_date = patent['filing_date']
 
-        patents.append((publication_number, title, abstract, claims, description, 
+        patents_text.append((publication_number, title, abstract, claims, 
                     publication_date, filing_date))
         
-    return patents
+    return patents_text
 
-def run():
-    patents = []
-    blobs = list_all_files(client, BUCKET_NAME)
-    for blob in blobs:
-        patents_json = download_blob(blob)
-        patents = extract_patent_data(patents_json, patents)
 
-    colnames = ['publication_number', 'title', 'abstract', 'claims', 'description', 
-            'publication_date', 'filing_date']
-    df = pd.DataFrame(data=patents, columns=colnames)
+patents_text = []
+patents_metadata = []
+blobs = list_all_files(client, BUCKET_NAME)
+for blob in tqdm(blobs):
+    patents_json = download_blob(blob)
+    patents_text = extract_patent_text(patents_json, patents_text)
+    patents_metadata = extract_patent_metadata(patents_json, patents_metadata)
 
-    return df.to_csv('patents_text.csv')
+colnames_text = ['publication_number', 'title', 'abstract', 'claims', 
+                'publication_date', 'filing_date']
+text = pd.DataFrame(data=patents_text, columns=colnames_text)
+text.to_csv('patents_text.csv')
+
+colnames_metadata = ['publication_number', 'country_code', 'title', 'publication_date', 
+                'filing_date', 'grant_date', 'inventor_list', 'inventor_list_cc', 
+                'assignee_list', 'assignee_list_cc', 'code', 'inventive', 'first', 
+                'amount_citation', 'citations', 'parents', 'parents_dates', 'childs', 
+                'childs_dates']
+metadata = pd.DataFrame(data=patents_metadata, columns=colnames_metadata)
+metadata.to_pickle(f"metadata.pkl")
