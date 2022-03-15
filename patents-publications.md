@@ -23,7 +23,7 @@ SELECT
     child
 FROM patents-public-data.patents.publications,
 UNNEST(cpc) as cpc
-WHERE country_code IN ('US', 'JP', 'DE', 'AR', 'BR', 'CL', 'EC', 'PY', 'PE', 'VE', 'BO')
+WHERE country_code = 'US'
 AND cpc.code LIKE 'A01N%'
 ```
 
